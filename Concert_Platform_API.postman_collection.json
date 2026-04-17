@@ -25,7 +25,7 @@
       "name": "01 Setup & Auth",
       "item": [
         {
-          "name": "Login Master Producer",
+          "name": "Login (Email OTP Challenge)",
           "request": {
             "method": "POST",
             "header": [
@@ -36,7 +36,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{producerEmail}}\",\n  \"password\": \"{{producerPassword}}\"\n}",
+              "raw": "{\n  \"email\": \"{{mfaLoginEmail}}\",\n  \"password\": \"{{mfaLoginPassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -52,10 +52,111 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
-                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);",
-                  "pm.test('Producer login response is valid', function () {",
+                  "if (json.mfaRequired && json.mfaToken) {",
+                  "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('mfaLoginEmail'));",
+                  "  pm.collectionVariables.unset('token');",
+                  "}",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('token', json.accessToken);",
+                  "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
+                  "}",
+                  "pm.test('Login response status is valid', function () {",
                   "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Email OTP (Get JWT)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{mfaChallengeEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"mfaToken\": \"{{mfaToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/mfa/verify"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('token', json.accessToken);",
+                  "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
+                  "}",
+                  "pm.test('Email OTP verification succeeds', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Enable Email MFA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/mfa/enable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Enable MFA response status is 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Disable Email MFA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/mfa/disable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Disable MFA response status is 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
                   "});"
                 ]
               }
@@ -154,8 +255,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
-                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);"
+                  "if (json.mfaRequired && json.mfaToken) {",
+                  "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('promoterEmail'));",
+                  "  pm.collectionVariables.unset('token');",
+                  "}",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('token', json.accessToken);",
+                  "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
+                  "}"
                 ]
               }
             }
@@ -266,8 +375,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
-                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);"
+                  "if (json.mfaRequired && json.mfaToken) {",
+                  "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('organizerEmail'));",
+                  "  pm.collectionVariables.unset('token');",
+                  "}",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('token', json.accessToken);",
+                  "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
+                  "}"
                 ]
               }
             }
@@ -297,66 +414,6 @@
               }
             },
             "url": "{{baseUrl}}/auth/organizer/setup-password"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Setup MFA",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
-              }
-            ],
-            "url": "{{baseUrl}}/auth/mfa/enable"
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "const json = pm.response.json();",
-                  "if (json.secret) pm.collectionVariables.set('mfaSecret', json.secret);",
-                  "if (json.otpauthUri) pm.collectionVariables.set('mfaOtpAuthUri', json.otpauthUri);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Verify MFA",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"{{organizerEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"mfaToken\": \"{{mfaToken}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": "{{baseUrl}}/auth/mfa/verify"
           },
           "event": [
             {
@@ -489,8 +546,16 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
-                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);"
+                  "if (json.mfaRequired && json.mfaToken) {",
+                  "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('attendeeEmail'));",
+                  "  pm.collectionVariables.unset('token');",
+                  "}",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('token', json.accessToken);",
+                  "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
+                  "}"
                 ]
               }
             }
@@ -601,7 +666,7 @@
       "value": ""
     },
     {
-      "key": "mfaSecret",
+      "key": "mfaChallengeEmail",
       "value": ""
     },
     {
@@ -655,6 +720,14 @@
     {
       "key": "otpCode",
       "value": ""
+    },
+    {
+      "key": "mfaLoginEmail",
+      "value": "{{producerEmail}}"
+    },
+    {
+      "key": "mfaLoginPassword",
+      "value": "{{producerPassword}}"
     }
   ]
 }
