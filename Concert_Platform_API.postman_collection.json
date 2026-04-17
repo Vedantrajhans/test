@@ -3,12 +3,29 @@
     "name": "Concert Platform API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('baseUrl')) pm.collectionVariables.set('baseUrl', 'http://localhost:8080/api/v1');",
+          "if (!pm.collectionVariables.get('producerEmail')) pm.collectionVariables.set('producerEmail', 'producer@test.com');",
+          "if (!pm.collectionVariables.get('producerPassword')) pm.collectionVariables.set('producerPassword', 'password123');",
+          "if (!pm.collectionVariables.get('promoterPassword')) pm.collectionVariables.set('promoterPassword', 'password123');",
+          "if (!pm.collectionVariables.get('organizerTempPassword')) pm.collectionVariables.set('organizerTempPassword', 'ChangeMe@12345');",
+          "if (!pm.collectionVariables.get('organizerNewPassword')) pm.collectionVariables.set('organizerNewPassword', 'password123');",
+          "if (!pm.collectionVariables.get('attendeePassword')) pm.collectionVariables.set('attendeePassword', 'password123');"
+        ]
+      }
+    }
+  ],
   "item": [
     {
-      "name": "🎬 Producers & Promoters",
+      "name": "01 Setup & Auth",
       "item": [
         {
-          "name": "Create Producer",
+          "name": "Login Master Producer",
           "request": {
             "method": "POST",
             "header": [
@@ -19,50 +36,552 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Producer\",\n  \"email\": \"producer@test.com\"\n}",
+              "raw": "{\n  \"email\": \"{{producerEmail}}\",\n  \"password\": \"{{producerPassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{baseUrl}}/api/producers"
-          }
-        },
-        {
-          "name": "Get Producers",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/api/producers"
-          }
-        },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
+                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);",
+                  "pm.test('Producer login response is valid', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Producers & Promoters",
+      "item": [
         {
           "name": "Create Promoter",
           "request": {
             "method": "POST",
             "header": [
               {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Promoter\",\n  \"email\": \"promoter@test.com\"\n}",
+              "raw": "{\n  \"email\": \"{{promoterEmail}}\",\n  \"firstName\": \"Promoter\",\n  \"lastName\": \"Admin\",\n  \"password\": \"{{promoterPassword}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
             },
-            "url": "{{baseUrl}}/api/promoters"
+            "url": "{{baseUrl}}/producer/promoters"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.email) pm.collectionVariables.set('promoterEmail', json.email);",
+                  "pm.test('Promoter created or already exists', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Promoters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/producer/promoters"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Organizers & Events",
+      "item": [
+        {
+          "name": "Login Promoter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{promoterEmail}}\",\n  \"password\": \"{{promoterPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
+                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Organizer (Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{organizerEmail}}\",\n  \"firstName\": \"Organizer\",\n  \"lastName\": \"User\",\n  \"organizerType\": \"Concert Organizer\",\n  \"companyName\": \"Live Concerts Pvt Ltd\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/promoter/organizers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.email) pm.collectionVariables.set('organizerEmail', json.email);",
+                  "pm.test('Organizer created or already exists', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Import Organizers via CSV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/promoter/organizers/import"
           }
         },
         {
-          "name": "Get Promoters",
+          "name": "Export Organizers to CSV",
           "request": {
             "method": "GET",
-            "url": "{{baseUrl}}/api/promoters"
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/promoter/organizers/export"
+          }
+        },
+        {
+          "name": "Login Organizer (First-Time)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{organizerEmail}}\",\n  \"password\": \"{{organizerTempPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
+                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Organizer Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"{{organizerNewPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/organizer/setup-password"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Setup MFA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/mfa/enable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.secret) pm.collectionVariables.set('mfaSecret', json.secret);",
+                  "if (json.otpauthUri) pm.collectionVariables.set('mfaOtpAuthUri', json.otpauthUri);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify MFA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{organizerEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"mfaToken\": \"{{mfaToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/mfa/verify"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Concert",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mega Concert 2026\",\n  \"description\": \"Main stage concert\",\n  \"genre\": \"Rock\",\n  \"dateTime\": \"2027-01-20T18:30:00\",\n  \"totalCapacity\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/organizer/concerts"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('concertId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Publish Concert",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": "{{baseUrl}}/organizer/concerts/{{concertId}}/publish"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Attendees & Bookings",
+      "item": [
+        {
+          "name": "Register Attendee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{attendeeEmail}}\",\n  \"password\": \"{{attendeePassword}}\",\n  \"firstName\": \"Attendee\",\n  \"lastName\": \"User\",\n  \"phone\": \"9999999999\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/register"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login Attendee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{attendeeEmail}}\",\n  \"password\": \"{{attendeePassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
+                  "if (json.mfaToken) pm.collectionVariables.set('mfaToken', json.mfaToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Search Concerts",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/concerts"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const list = Array.isArray(json) ? json : (json.content || json.data || []);",
+                  "const firstConcert = Array.isArray(list) && list.length > 0 ? list[0] : null;",
+                  "if (firstConcert && firstConcert.id) pm.collectionVariables.set('concertId', String(firstConcert.id));",
+                  "const ticketTypes = firstConcert && Array.isArray(firstConcert.ticketTypes) ? firstConcert.ticketTypes : [];",
+                  "if (ticketTypes.length > 0 && ticketTypes[0].id) pm.collectionVariables.set('ticketTypeId', String(ticketTypes[0].id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Book Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"concertId\": {{concertId}},\n  \"ticketTypeId\": {{ticketTypeId}},\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/bookings/reserve",
+            "description": "Run this request multiple times rapidly to test booking concurrency. If ticketTypeId was not auto-captured from Search Concerts, copy the value from Search Concerts response (first concert -> ticketTypes[0].id) and set it in the collection variables panel as {{ticketTypeId}} before running."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.uuid) pm.collectionVariables.set('bookingUuid', json.uuid);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Leave Feedback",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"concertId\": {{concertId}},\n  \"rating\": 5,\n  \"comment\": \"Amazing show!\",\n  \"soundQuality\": 5,\n  \"venueExperience\": 5,\n  \"artistPerformance\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/feedback"
           }
         }
       ]
@@ -71,7 +590,71 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:8080"
+      "value": "http://localhost:8080/api/v1"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "mfaToken",
+      "value": ""
+    },
+    {
+      "key": "mfaSecret",
+      "value": ""
+    },
+    {
+      "key": "concertId",
+      "value": ""
+    },
+    {
+      "key": "bookingUuid",
+      "value": ""
+    },
+    {
+      "key": "producerEmail",
+      "value": "producer@test.com"
+    },
+    {
+      "key": "producerPassword",
+      "value": "password123"
+    },
+    {
+      "key": "promoterEmail",
+      "value": "promoter1@test.com"
+    },
+    {
+      "key": "promoterPassword",
+      "value": "password123"
+    },
+    {
+      "key": "organizerEmail",
+      "value": "organizer1@test.com"
+    },
+    {
+      "key": "organizerTempPassword",
+      "value": "ChangeMe@12345"
+    },
+    {
+      "key": "organizerNewPassword",
+      "value": "password123"
+    },
+    {
+      "key": "attendeeEmail",
+      "value": "attendee1@test.com"
+    },
+    {
+      "key": "attendeePassword",
+      "value": "password123"
+    },
+    {
+      "key": "ticketTypeId",
+      "value": ""
+    },
+    {
+      "key": "otpCode",
+      "value": ""
     }
   ]
 }
