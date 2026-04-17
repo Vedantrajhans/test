@@ -79,15 +79,9 @@ public class AuthDto {
 
     @Data
     public static class MfaSetupResponse {
-        private String secret;
-        private String otpauthUri;
-        private String qrCodeUrl;
-        public String getSecret() { return this.secret; }
-        public void setSecret(String secret) { this.secret = secret; }
-        public String getOtpauthUri() { return this.otpauthUri; }
-        public void setOtpauthUri(String otpauthUri) { this.otpauthUri = otpauthUri; }
-        public String getQrCodeUrl() { return this.qrCodeUrl; }
-        public void setQrCodeUrl(String qrCodeUrl) { this.qrCodeUrl = qrCodeUrl; }
+        private String message;
+        public String getMessage() { return this.message; }
+        public void setMessage(String message) { this.message = message; }
     }
 
     @Data
