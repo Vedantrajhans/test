@@ -1,0 +1,182 @@
+package com.vedant.concert_platform.service;
+
+import com.vedant.concert_platform.dto.AuthDto;
+import com.vedant.concert_platform.entity.User;
+import com.vedant.concert_platform.entity.enums.Role;
+import com.vedant.concert_platform.exception.BadRequestException;
+import com.vedant.concert_platform.exception.ConflictException;
+import com.vedant.concert_platform.exception.ResourceNotFoundException;
+import com.vedant.concert_platform.repository.UserRepository;
+import com.vedant.concert_platform.security.JwtUtil;
+import dev.samstevens.totp.code.CodeVerifier;
+import dev.samstevens.totp.secret.SecretGenerator;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final AuthenticationManager authenticationManager;
+    private final SecretGenerator secretGenerator;
+    private final CodeVerifier codeVerifier;
+
+    public AuthDto.TokenResponse register(AuthDto.RegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new ConflictException("Email already in use");
+        }
+
+        User user = new User();
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setPhone(request.getPhone());
+        user.setRole(Role.ATTENDEE);
+        user.setFirstLogin(false);
+
+        userRepository.save(user);
+
+        return generateTokenResponse(user);
+    }
+
+    public AuthDto.TokenResponse login(AuthDto.LoginRequest request) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        User user = userRepository.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.isMfaEnabled()) {
+            AuthDto.TokenResponse response = new AuthDto.TokenResponse();
+            response.setMfaRequired(true);
+            return response;
+        }
+
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        return generateTokenResponse(user);
+    }
+
+    public AuthDto.TokenResponse verifyMfa(AuthDto.MfaVerifyRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.isMfaEnabled()) {
+            throw new BadRequestException("MFA is not enabled for this user");
+        }
+
+        boolean isValid = codeVerifier.isValidCode(user.getMfaSecret(), request.getCode());
+        if (!isValid) {
+            throw new BadRequestException("Invalid MFA code");
+        }
+
+        // Auth success
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+        );
+
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        AuthDto.TokenResponse response = new AuthDto.TokenResponse();
+        response.setAccessToken(jwtUtil.generateToken(userDetails));
+        response.setRole(user.getRole());
+        response.setMfaRequired(false);
+        return response;
+    }
+
+    public AuthDto.TokenResponse setupOrganizerPassword(AuthDto.OrganizerSetupRequest request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.isFirstLogin() || user.getRole() != Role.ORGANIZER) {
+            throw new BadRequestException("Invalid operation or account already setup");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setFirstLogin(false);
+        user.setLastLoginAt(LocalDateTime.now());
+        
+        userRepository.save(user);
+
+        return generateTokenResponse(user);
+    }
+
+    public String generateMfaSecret(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        String secret = secretGenerator.generate();
+        user.setMfaSecret(secret);
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+        return secret;
+    }
+
+    public AuthDto.MfaSetupResponse enableMfa() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (user.isMfaEnabled()) {
+            throw new BadRequestException("MFA is already enabled for this account");
+        }
+
+        String secret = secretGenerator.generate();
+        user.setMfaSecret(secret);
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+
+        String otpauthUri = "otpauth://totp/ConcertPlatform:" + user.getEmail()
+                + "?secret=" + secret + "&issuer=ConcertPlatform";
+
+        AuthDto.MfaSetupResponse response = new AuthDto.MfaSetupResponse();
+        response.setSecret(secret);
+        response.setOtpauthUri(otpauthUri);
+        return response;
+    }
+
+    public void disableMfa() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (!user.isMfaEnabled()) {
+            throw new BadRequestException("MFA is not enabled for this account");
+        }
+
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        userRepository.save(user);
+    }
+
+    private AuthDto.TokenResponse generateTokenResponse(User user) {
+        UserDetails userDetails = new org.springframework.security.core.userdetails.User(
+                user.getEmail(),
+                user.getPassword(),
+                java.util.Collections.singletonList(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+        );
+        AuthDto.TokenResponse response = new AuthDto.TokenResponse();
+        response.setAccessToken(jwtUtil.generateToken(userDetails));
+        response.setRole(user.getRole());
+        response.setMfaRequired(false);
+        return response;
+    }
+}
