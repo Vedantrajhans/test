@@ -8,10 +8,10 @@ import com.vedant.concert_platform.exception.ConflictException;
 import com.vedant.concert_platform.exception.ResourceNotFoundException;
 import com.vedant.concert_platform.repository.UserRepository;
 import com.vedant.concert_platform.security.JwtUtil;
-import dev.samstevens.totp.code.CodeVerifier;
-import dev.samstevens.totp.secret.SecretGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,6 +20,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -33,12 +36,15 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
-    private final SecretGenerator secretGenerator;
-    private final CodeVerifier codeVerifier;
+    private final JavaMailSender mailSender;
     private final Map<String, MfaChallenge> pendingMfaTokens = new ConcurrentHashMap<>();
+    private final SecureRandom secureRandom = new SecureRandom();
 
     @Value("${app.mfa.challenge.expiration-minutes:5}")
     private long mfaChallengeExpirationMinutes;
+
+    @Value("${app.mail.from:${spring.mail.username:no-reply@concert.local}}")
+    private String mailFrom;
 
     public AuthDto.TokenResponse register(AuthDto.RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -69,11 +75,19 @@ public class AuthService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (user.isMfaEnabled()) {
+            removeExpiredChallenges();
             AuthDto.TokenResponse response = new AuthDto.TokenResponse();
             response.setMfaRequired(true);
             response.setFirstLoginRequired(user.isFirstLogin());
             String mfaToken = UUID.randomUUID().toString();
-            pendingMfaTokens.put(mfaToken, new MfaChallenge(user.getEmail(), LocalDateTime.now().plusMinutes(mfaChallengeExpirationMinutes)));
+            MfaChallenge challenge = new MfaChallenge(user.getEmail(), generateOtp(), LocalDateTime.now().plusMinutes(mfaChallengeExpirationMinutes));
+            pendingMfaTokens.put(mfaToken, challenge);
+            try {
+                sendMfaOtpEmail(user.getEmail(), challenge.code());
+            } catch (BadRequestException ex) {
+                pendingMfaTokens.remove(mfaToken);
+                throw ex;
+            }
             response.setMfaToken(mfaToken);
             return response;
         }
@@ -85,6 +99,7 @@ public class AuthService {
     }
 
     public AuthDto.TokenResponse verifyMfa(AuthDto.MfaVerifyRequest request) {
+        removeExpiredChallenges();
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
@@ -92,13 +107,12 @@ public class AuthService {
             throw new BadRequestException("MFA is not enabled for this user");
         }
 
-        boolean isValid = codeVerifier.isValidCode(user.getMfaSecret(), request.getCode());
-        if (!isValid) {
-            throw new BadRequestException("Invalid MFA code");
-        }
         MfaChallenge challenge = pendingMfaTokens.get(request.getMfaToken());
         if (challenge == null || challenge.expiresAt().isBefore(LocalDateTime.now()) || !challenge.email().equals(user.getEmail())) {
             throw new BadRequestException("MFA challenge is invalid or expired");
+        }
+        if (!isOtpMatch(challenge.code(), request.getCode())) {
+            throw new BadRequestException("Invalid MFA code");
         }
         pendingMfaTokens.remove(request.getMfaToken());
 
@@ -138,16 +152,6 @@ public class AuthService {
         return generateTokenResponse(user);
     }
 
-    public String generateMfaSecret(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        String secret = secretGenerator.generate();
-        user.setMfaSecret(secret);
-        user.setMfaEnabled(true);
-        userRepository.save(user);
-        return secret;
-    }
-
     public AuthDto.MfaSetupResponse enableMfa() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(username)
@@ -157,18 +161,11 @@ public class AuthService {
             throw new BadRequestException("MFA is already enabled for this account");
         }
 
-        String secret = secretGenerator.generate();
-        user.setMfaSecret(secret);
         user.setMfaEnabled(true);
         userRepository.save(user);
 
-        String otpauthUri = "otpauth://totp/ConcertPlatform:" + user.getEmail()
-                + "?secret=" + secret + "&issuer=ConcertPlatform";
-
         AuthDto.MfaSetupResponse response = new AuthDto.MfaSetupResponse();
-        response.setSecret(secret);
-        response.setOtpauthUri(otpauthUri);
-        response.setQrCodeUrl(otpauthUri);
+        response.setMessage("MFA enabled successfully. OTP codes will be sent to your email.");
         return response;
     }
 
@@ -200,5 +197,34 @@ public class AuthService {
         return response;
     }
 
-    private record MfaChallenge(String email, LocalDateTime expiresAt) { }
+    private String generateOtp() {
+        return String.format("%06d", secureRandom.nextInt(1_000_000));
+    }
+
+    private void sendMfaOtpEmail(String to, String code) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(mailFrom);
+            message.setTo(to);
+            message.setSubject("Your Concert Platform OTP");
+            message.setText("Your OTP is " + code + ". It will expire in " + mfaChallengeExpirationMinutes + " minutes.");
+            mailSender.send(message);
+        } catch (Exception ex) {
+            throw new BadRequestException("Failed to send MFA code email");
+        }
+    }
+
+    private boolean isOtpMatch(String expectedCode, String providedCode) {
+        return MessageDigest.isEqual(
+                expectedCode.getBytes(StandardCharsets.UTF_8),
+                providedCode.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
+    private void removeExpiredChallenges() {
+        LocalDateTime now = LocalDateTime.now();
+        pendingMfaTokens.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
+    }
+
+    private record MfaChallenge(String email, String code, LocalDateTime expiresAt) { }
 }
