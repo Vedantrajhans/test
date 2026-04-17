@@ -9,9 +9,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface OrganizerRepository extends JpaRepository<Organizer, Long> {
     Optional<Organizer> findByUserId(Long userId);
+    Optional<Organizer> findByUserEmail(String email);
+    List<Organizer> findByPromoterId(Long promoterId);
 
     @Query("SELECT o FROM Organizer o WHERE " +
             "(:status IS NULL OR o.status = :status) AND " +
