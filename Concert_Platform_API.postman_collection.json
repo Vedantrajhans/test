@@ -15,9 +15,7 @@
           "if (!pm.collectionVariables.get('promoterPassword')) pm.collectionVariables.set('promoterPassword', 'password123');",
           "if (!pm.collectionVariables.get('organizerTempPassword')) pm.collectionVariables.set('organizerTempPassword', 'ChangeMe@12345');",
           "if (!pm.collectionVariables.get('organizerNewPassword')) pm.collectionVariables.set('organizerNewPassword', 'password123');",
-          "if (!pm.collectionVariables.get('attendeePassword')) pm.collectionVariables.set('attendeePassword', 'password123');",
-          "if (!pm.collectionVariables.get('mfaLoginEmail')) pm.collectionVariables.set('mfaLoginEmail', pm.collectionVariables.get('producerEmail'));",
-          "if (!pm.collectionVariables.get('mfaLoginPassword')) pm.collectionVariables.set('mfaLoginPassword', pm.collectionVariables.get('producerPassword'));"
+          "if (!pm.collectionVariables.get('attendeePassword')) pm.collectionVariables.set('attendeePassword', 'password123');"
         ]
       }
     }
@@ -56,12 +54,13 @@
                   "const json = pm.response.json();",
                   "if (json.mfaRequired && json.mfaToken) {",
                   "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
-                  "  pm.collectionVariables.set('mfaEmail', pm.variables.replaceIn('{{mfaLoginEmail}}'));",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('mfaLoginEmail'));",
                   "  pm.collectionVariables.unset('token');",
                   "}",
                   "if (json.accessToken) {",
                   "  pm.collectionVariables.set('token', json.accessToken);",
                   "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
                   "}",
                   "pm.test('Login response status is valid', function () {",
                   "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
@@ -83,7 +82,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{mfaEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"mfaToken\": \"{{mfaToken}}\"\n}",
+              "raw": "{\n  \"email\": \"{{mfaChallengeEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"mfaToken\": \"{{mfaToken}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -99,8 +98,11 @@
                 "type": "text/javascript",
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.accessToken) pm.collectionVariables.set('token', json.accessToken);",
-                  "if (json.accessToken) pm.collectionVariables.unset('mfaToken');",
+                  "if (json.accessToken) {",
+                  "  pm.collectionVariables.set('token', json.accessToken);",
+                  "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
+                  "}",
                   "pm.test('Email OTP verification succeeds', function () {",
                   "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
                   "});"
@@ -127,8 +129,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Enable MFA response status is valid', function () {",
-                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "pm.test('Enable MFA response status is 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
                   "});"
                 ]
               }
@@ -153,8 +155,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Disable MFA response status is valid', function () {",
-                  "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "pm.test('Disable MFA response status is 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
                   "});"
                 ]
               }
@@ -255,12 +257,13 @@
                   "const json = pm.response.json();",
                   "if (json.mfaRequired && json.mfaToken) {",
                   "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
-                  "  pm.collectionVariables.set('mfaEmail', pm.variables.replaceIn('{{promoterEmail}}'));",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('promoterEmail'));",
                   "  pm.collectionVariables.unset('token');",
                   "}",
                   "if (json.accessToken) {",
                   "  pm.collectionVariables.set('token', json.accessToken);",
                   "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
                   "}"
                 ]
               }
@@ -374,12 +377,13 @@
                   "const json = pm.response.json();",
                   "if (json.mfaRequired && json.mfaToken) {",
                   "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
-                  "  pm.collectionVariables.set('mfaEmail', pm.variables.replaceIn('{{organizerEmail}}'));",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('organizerEmail'));",
                   "  pm.collectionVariables.unset('token');",
                   "}",
                   "if (json.accessToken) {",
                   "  pm.collectionVariables.set('token', json.accessToken);",
                   "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
                   "}"
                 ]
               }
@@ -544,12 +548,13 @@
                   "const json = pm.response.json();",
                   "if (json.mfaRequired && json.mfaToken) {",
                   "  pm.collectionVariables.set('mfaToken', json.mfaToken);",
-                  "  pm.collectionVariables.set('mfaEmail', pm.variables.replaceIn('{{attendeeEmail}}'));",
+                  "  pm.collectionVariables.set('mfaChallengeEmail', pm.collectionVariables.get('attendeeEmail'));",
                   "  pm.collectionVariables.unset('token');",
                   "}",
                   "if (json.accessToken) {",
                   "  pm.collectionVariables.set('token', json.accessToken);",
                   "  pm.collectionVariables.unset('mfaToken');",
+                  "  pm.collectionVariables.unset('mfaChallengeEmail');",
                   "}"
                 ]
               }
@@ -661,7 +666,7 @@
       "value": ""
     },
     {
-      "key": "mfaEmail",
+      "key": "mfaChallengeEmail",
       "value": ""
     },
     {
