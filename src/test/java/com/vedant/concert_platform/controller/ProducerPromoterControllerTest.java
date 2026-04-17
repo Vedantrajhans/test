@@ -69,7 +69,7 @@ class ProducerPromoterControllerTest {
         mockMvc.perform(post("/api/producers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.email").value("hello@aegpresents.com"));
     }
@@ -105,7 +105,7 @@ class ProducerPromoterControllerTest {
         mockMvc.perform(post("/api/promoters")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.email").value("john@promotions.com"));
     }
