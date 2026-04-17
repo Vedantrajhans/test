@@ -9,6 +9,7 @@ import com.vedant.concert_platform.exception.ResourceNotFoundException;
 import com.vedant.concert_platform.repository.UserRepository;
 import com.vedant.concert_platform.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -29,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class AuthService {
 
@@ -43,7 +46,7 @@ public class AuthService {
     @Value("${app.mfa.challenge.expiration-minutes:5}")
     private long mfaChallengeExpirationMinutes;
 
-    @Value("${app.mail.from:${spring.mail.username:no-reply@concert.local}}")
+    @Value("${app.mail.from:no-reply@concert.local}")
     private String mailFrom;
 
     public AuthDto.TokenResponse register(AuthDto.RegisterRequest request) {
@@ -80,10 +83,15 @@ public class AuthService {
             response.setMfaRequired(true);
             response.setFirstLoginRequired(user.isFirstLogin());
             String mfaToken = UUID.randomUUID().toString();
-            MfaChallenge challenge = new MfaChallenge(user.getEmail(), generateOtp(), LocalDateTime.now().plusMinutes(mfaChallengeExpirationMinutes));
+            String otpCode = generateOtp();
+            MfaChallenge challenge = new MfaChallenge(
+                    user.getEmail(),
+                    hashOtp(otpCode),
+                    LocalDateTime.now().plusMinutes(mfaChallengeExpirationMinutes)
+            );
             pendingMfaTokens.put(mfaToken, challenge);
             try {
-                sendMfaOtpEmail(user.getEmail(), challenge.code());
+                sendMfaOtpEmail(user.getEmail(), otpCode);
             } catch (BadRequestException ex) {
                 pendingMfaTokens.remove(mfaToken);
                 throw ex;
@@ -111,7 +119,7 @@ public class AuthService {
         if (challenge == null || challenge.expiresAt().isBefore(LocalDateTime.now()) || !challenge.email().equals(user.getEmail())) {
             throw new BadRequestException("MFA challenge is invalid or expired");
         }
-        if (!isOtpMatch(challenge.code(), request.getCode())) {
+        if (!isOtpMatch(challenge.codeHash(), request.getCode())) {
             throw new BadRequestException("Invalid MFA code");
         }
         pendingMfaTokens.remove(request.getMfaToken());
@@ -210,15 +218,30 @@ public class AuthService {
             message.setText("Your OTP is " + code + ". It will expire in " + mfaChallengeExpirationMinutes + " minutes.");
             mailSender.send(message);
         } catch (Exception ex) {
+            log.warn("Failed to send MFA OTP email to {}", to, ex);
             throw new BadRequestException("Failed to send MFA code email");
         }
     }
 
-    private boolean isOtpMatch(String expectedCode, String providedCode) {
+    private boolean isOtpMatch(String expectedCodeHash, String providedCode) {
         return MessageDigest.isEqual(
-                expectedCode.getBytes(StandardCharsets.UTF_8),
-                providedCode.getBytes(StandardCharsets.UTF_8)
+                expectedCodeHash.getBytes(StandardCharsets.UTF_8),
+                hashOtp(providedCode).getBytes(StandardCharsets.UTF_8)
         );
+    }
+
+    private String hashOtp(String code) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(code.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
     }
 
     private void removeExpiredChallenges() {
@@ -226,5 +249,5 @@ public class AuthService {
         pendingMfaTokens.entrySet().removeIf(entry -> entry.getValue().expiresAt().isBefore(now));
     }
 
-    private record MfaChallenge(String email, String code, LocalDateTime expiresAt) { }
+    private record MfaChallenge(String email, String codeHash, LocalDateTime expiresAt) { }
 }
