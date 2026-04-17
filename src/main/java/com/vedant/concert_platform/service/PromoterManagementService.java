@@ -23,11 +23,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.*;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class PromoterManagementService {
+    private static final String DEFAULT_ORGANIZER_TYPE = "Concert Organizer";
+    private static final String DEFAULT_ORGANIZER_PASSWORD = "ChangeMe@12345";
+
     private final UserRepository userRepository;
     private final PromoterRepository promoterRepository;
     private final OrganizerRepository organizerRepository;
@@ -39,11 +41,10 @@ public class PromoterManagementService {
             throw new ConflictException("Email already exists");
         }
         Promoter promoter = getCurrentPromoter();
-        String temporaryPassword = createTemporaryPassword();
 
         User user = new User();
         user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(temporaryPassword));
+        user.setPassword(passwordEncoder.encode(DEFAULT_ORGANIZER_PASSWORD));
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setRole(Role.ORGANIZER);
@@ -59,14 +60,14 @@ public class PromoterManagementService {
         organizer.setState(request.getState());
         organizer = organizerRepository.save(organizer);
 
-        return mapOrganizer(organizer, temporaryPassword);
+        return mapOrganizer(organizer);
     }
 
     @Transactional(readOnly = true)
     public List<HierarchyDto.OrganizerResponse> listOrganizers() {
         Promoter promoter = getCurrentPromoter();
         return organizerRepository.findByPromoterId(promoter.getId()).stream()
-                .map(org -> mapOrganizer(org, null))
+                .map(this::mapOrganizer)
                 .toList();
     }
 
@@ -85,10 +86,9 @@ public class PromoterManagementService {
                 }
                 Organizer organizer = organizerRepository.findByUserEmail(email).orElse(null);
                 if (organizer == null) {
-                    String temporaryPassword = createTemporaryPassword();
                     User user = new User();
                     user.setEmail(email);
-                    user.setPassword(passwordEncoder.encode(temporaryPassword));
+                    user.setPassword(passwordEncoder.encode(DEFAULT_ORGANIZER_PASSWORD));
                     user.setFirstName(safeTrim(row.get("firstName")));
                     user.setLastName(safeTrim(row.get("lastName")));
                     user.setRole(Role.ORGANIZER);
@@ -106,7 +106,7 @@ public class PromoterManagementService {
                     result.setCreatedCount(result.getCreatedCount() + 1);
                 } else {
                     if (!organizer.getPromoter().getId().equals(promoter.getId())) {
-                        throw new ConflictException("Organizer belongs to another promoter: " + email);
+                        throw new ConflictException("Cannot update organizer belonging to another promoter");
                     }
                     organizer.getUser().setFirstName(safeTrim(row.get("firstName")));
                     organizer.getUser().setLastName(safeTrim(row.get("lastName")));
@@ -119,7 +119,7 @@ public class PromoterManagementService {
                 }
             }
         } catch (IOException e) {
-            throw new BadRequestException("Invalid CSV file");
+            throw new BadRequestException("Invalid CSV file: " + e.getMessage());
         }
 
         return result;
@@ -148,7 +148,7 @@ public class PromoterManagementService {
             csvWriter.flush();
             return outputStream.toByteArray();
         } catch (IOException e) {
-            throw new BadRequestException("Failed to export CSV");
+            throw new BadRequestException("Failed to export CSV: " + e.getMessage());
         }
     }
 
@@ -166,7 +166,7 @@ public class PromoterManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Promoter profile not found"));
     }
 
-    private HierarchyDto.OrganizerResponse mapOrganizer(Organizer organizer, String temporaryPassword) {
+    private HierarchyDto.OrganizerResponse mapOrganizer(Organizer organizer) {
         HierarchyDto.OrganizerResponse response = new HierarchyDto.OrganizerResponse();
         response.setId(organizer.getId());
         response.setEmail(organizer.getUser().getEmail());
@@ -178,7 +178,6 @@ public class PromoterManagementService {
         response.setState(organizer.getState());
         response.setStatus(organizer.getStatus());
         response.setFirstLoginRequired(organizer.getUser().isFirstLogin());
-        response.setTemporaryPassword(temporaryPassword);
         return response;
     }
 
@@ -188,10 +187,6 @@ public class PromoterManagementService {
 
     private String defaultOrganizerType(String organizerType) {
         String value = safeTrim(organizerType);
-        return (value == null || value.isBlank()) ? "Concert Organizer" : value;
-    }
-
-    private String createTemporaryPassword() {
-        return "Tmp@" + UUID.randomUUID().toString().substring(0, 10);
+        return (value == null || value.isBlank()) ? DEFAULT_ORGANIZER_TYPE : value;
     }
 }

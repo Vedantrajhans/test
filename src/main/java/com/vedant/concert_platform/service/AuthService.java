@@ -11,6 +11,7 @@ import com.vedant.concert_platform.security.JwtUtil;
 import dev.samstevens.totp.code.CodeVerifier;
 import dev.samstevens.totp.secret.SecretGenerator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -19,8 +20,6 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -36,7 +35,10 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final SecretGenerator secretGenerator;
     private final CodeVerifier codeVerifier;
-    private final Map<String, String> pendingMfaTokens = new ConcurrentHashMap<>();
+    private final Map<String, MfaChallenge> pendingMfaTokens = new ConcurrentHashMap<>();
+
+    @Value("${app.mfa.challenge.expiration-minutes:5}")
+    private long mfaChallengeExpirationMinutes;
 
     public AuthDto.TokenResponse register(AuthDto.RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -71,7 +73,7 @@ public class AuthService {
             response.setMfaRequired(true);
             response.setFirstLoginRequired(user.isFirstLogin());
             String mfaToken = UUID.randomUUID().toString();
-            pendingMfaTokens.put(user.getEmail(), mfaToken);
+            pendingMfaTokens.put(mfaToken, new MfaChallenge(user.getEmail(), LocalDateTime.now().plusMinutes(mfaChallengeExpirationMinutes)));
             response.setMfaToken(mfaToken);
             return response;
         }
@@ -94,11 +96,11 @@ public class AuthService {
         if (!isValid) {
             throw new BadRequestException("Invalid MFA code");
         }
-        String pendingToken = pendingMfaTokens.get(user.getEmail());
-        if (pendingToken == null || !pendingToken.equals(request.getMfaToken())) {
+        MfaChallenge challenge = pendingMfaTokens.get(request.getMfaToken());
+        if (challenge == null || challenge.expiresAt().isBefore(LocalDateTime.now()) || !challenge.email().equals(user.getEmail())) {
             throw new BadRequestException("MFA challenge is invalid or expired");
         }
-        pendingMfaTokens.remove(user.getEmail());
+        pendingMfaTokens.remove(request.getMfaToken());
 
         // Auth success
         UserDetails userDetails = new org.springframework.security.core.userdetails.User(
@@ -166,7 +168,7 @@ public class AuthService {
         AuthDto.MfaSetupResponse response = new AuthDto.MfaSetupResponse();
         response.setSecret(secret);
         response.setOtpauthUri(otpauthUri);
-        response.setQrCodeUrl("https://quickchart.io/qr?text=" + URLEncoder.encode(otpauthUri, StandardCharsets.UTF_8));
+        response.setQrCodeUrl(otpauthUri);
         return response;
     }
 
@@ -197,4 +199,6 @@ public class AuthService {
         response.setFirstLoginRequired(user.isFirstLogin());
         return response;
     }
+
+    private record MfaChallenge(String email, LocalDateTime expiresAt) { }
 }

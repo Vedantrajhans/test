@@ -28,10 +28,6 @@ public class FeedbackService {
         Concert concert = concertRepository.findById(request.getConcertId())
                 .orElseThrow(() -> new ResourceNotFoundException("Concert not found"));
 
-        if (feedbackRepository.existsByUserIdAndConcertId(user.getId(), concert.getId())) {
-            throw new ConflictException("Feedback already submitted for this concert");
-        }
-
         Feedback feedback = new Feedback();
         feedback.setUser(user);
         feedback.setConcert(concert);

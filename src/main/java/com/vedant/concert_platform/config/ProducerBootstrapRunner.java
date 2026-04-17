@@ -21,7 +21,7 @@ public class ProducerBootstrapRunner implements CommandLineRunner {
     @Value("${app.bootstrap.producer.email:producer@concert.local}")
     private String producerEmail;
 
-    @Value("${app.bootstrap.producer.password:Producer@123}")
+    @Value("${app.bootstrap.producer.password:}")
     private String producerPassword;
 
     @Value("${app.bootstrap.producer.first-name:Super}")
@@ -34,6 +34,9 @@ public class ProducerBootstrapRunner implements CommandLineRunner {
     public void run(String... args) {
         if (producerRepository.count() > 0) {
             return;
+        }
+        if (producerPassword == null || producerPassword.isBlank()) {
+            throw new IllegalStateException("app.bootstrap.producer.password must be configured");
         }
 
         User user = userRepository.findByEmail(producerEmail).orElseGet(() -> {

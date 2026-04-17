@@ -55,7 +55,6 @@ public class HierarchyDto {
         private String state;
         private Status status;
         private boolean firstLoginRequired;
-        private String temporaryPassword;
     }
 
     @Data

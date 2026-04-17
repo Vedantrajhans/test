@@ -200,10 +200,3 @@ CREATE INDEX idx_concerts_organizer ON concerts(organizer_id);
 CREATE INDEX idx_ticket_types_concert ON ticket_types(concert_id);
 CREATE INDEX idx_ticket_bookings_user ON ticket_bookings(user_id);
 CREATE INDEX idx_feedback_concert ON feedback(concert_id);
-
--- Seed single producer user + profile (password = password123)
-INSERT INTO users (email, password, first_name, last_name, role, first_login, mfa_enabled, status)
-VALUES ('producer@concert.local', '$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HCGKKsy.N1MGBR4hO.4Oq', 'Super', 'Admin', 'PRODUCER', FALSE, FALSE, 'ACTIVE');
-
-INSERT INTO producers (user_id)
-SELECT id FROM users WHERE email = 'producer@concert.local';
