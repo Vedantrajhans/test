@@ -1,0 +1,77 @@
+{
+  "info": {
+    "name": "Concert Platform API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "🎬 Producers & Promoters",
+      "item": [
+        {
+          "name": "Create Producer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Producer\",\n  \"email\": \"producer@test.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/producers"
+          }
+        },
+        {
+          "name": "Get Producers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/producers"
+          }
+        },
+        {
+          "name": "Create Promoter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Promoter\",\n  \"email\": \"promoter@test.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/api/promoters"
+          }
+        },
+        {
+          "name": "Get Promoters",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/promoters"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ]
+}
