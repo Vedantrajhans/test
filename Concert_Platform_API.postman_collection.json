@@ -501,10 +501,26 @@
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/concerts"
-          }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "const list = Array.isArray(json) ? json : (json.content || json.data || []);",
+                  "const firstConcert = Array.isArray(list) && list.length > 0 ? list[0] : null;",
+                  "if (firstConcert && firstConcert.id) pm.collectionVariables.set('concertId', String(firstConcert.id));",
+                  "const ticketTypes = firstConcert && Array.isArray(firstConcert.ticketTypes) ? firstConcert.ticketTypes : [];",
+                  "if (ticketTypes.length > 0 && ticketTypes[0].id) pm.collectionVariables.set('ticketTypeId', String(ticketTypes[0].id));"
+                ]
+              }
+            }
+          ]
         },
         {
-          "name": "Book Ticket (Run this repeatedly for concurrency)",
+          "name": "Book Ticket",
           "request": {
             "method": "POST",
             "header": [
@@ -526,7 +542,8 @@
                 }
               }
             },
-            "url": "{{baseUrl}}/bookings/reserve"
+            "url": "{{baseUrl}}/bookings/reserve",
+            "description": "Run this request multiple times rapidly to test booking concurrency. If ticketTypeId was not auto-captured from Search Concerts, copy the value from Search Concerts response (first concert -> ticketTypes[0].id) and set it in the collection variables panel as {{ticketTypeId}} before running."
           },
           "event": [
             {
@@ -633,7 +650,7 @@
     },
     {
       "key": "ticketTypeId",
-      "value": "1"
+      "value": ""
     },
     {
       "key": "otpCode",
