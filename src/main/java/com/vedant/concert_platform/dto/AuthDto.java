@@ -58,10 +58,14 @@ public class AuthDto {
         
         @NotBlank
         private String code;
+        @NotBlank
+        private String mfaToken;
         public String getEmail() { return this.email; }
         public void setEmail(String email) { this.email = email; }
         public String getCode() { return this.code; }
         public void setCode(String code) { this.code = code; }
+        public String getMfaToken() { return this.mfaToken; }
+        public void setMfaToken(String mfaToken) { this.mfaToken = mfaToken; }
     }
 
     @Data
@@ -77,25 +81,34 @@ public class AuthDto {
     public static class MfaSetupResponse {
         private String secret;
         private String otpauthUri;
+        private String qrCodeUrl;
         public String getSecret() { return this.secret; }
         public void setSecret(String secret) { this.secret = secret; }
         public String getOtpauthUri() { return this.otpauthUri; }
         public void setOtpauthUri(String otpauthUri) { this.otpauthUri = otpauthUri; }
+        public String getQrCodeUrl() { return this.qrCodeUrl; }
+        public void setQrCodeUrl(String qrCodeUrl) { this.qrCodeUrl = qrCodeUrl; }
     }
 
     @Data
     public static class TokenResponse {
         private String accessToken;
         private String refreshToken;
+        private String mfaToken;
         private Role role;
         private boolean mfaRequired;
+        private boolean firstLoginRequired;
         public String getAccessToken() { return this.accessToken; }
         public void setAccessToken(String accessToken) { this.accessToken = accessToken; }
         public String getRefreshToken() { return this.refreshToken; }
         public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
+        public String getMfaToken() { return this.mfaToken; }
+        public void setMfaToken(String mfaToken) { this.mfaToken = mfaToken; }
         public Role getRole() { return this.role; }
         public void setRole(Role role) { this.role = role; }
         public boolean getMfaRequired() { return this.mfaRequired; }
         public void setMfaRequired(boolean mfaRequired) { this.mfaRequired = mfaRequired; }
+        public boolean getFirstLoginRequired() { return this.firstLoginRequired; }
+        public void setFirstLoginRequired(boolean firstLoginRequired) { this.firstLoginRequired = firstLoginRequired; }
     }
 }

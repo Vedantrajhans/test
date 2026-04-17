@@ -24,6 +24,10 @@ public class Organizer extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "promoter_id", nullable = false)
+    private Promoter promoter;
+
     @NotBlank
     private String organizerType;           // e.g., "Concert Promoter", "Festival Organizer", "Independent Gig"
 
@@ -48,6 +52,8 @@ public class Organizer extends BaseEntity {
     public void setId(Long id) { this.id = id; }
     public User getUser() { return this.user; }
     public void setUser(User user) { this.user = user; }
+    public Promoter getPromoter() { return this.promoter; }
+    public void setPromoter(Promoter promoter) { this.promoter = promoter; }
     public String getOrganizerType() { return this.organizerType; }
     public void setOrganizerType(String organizerType) { this.organizerType = organizerType; }
     public List<String> getPreferredGenres() { return this.preferredGenres; }

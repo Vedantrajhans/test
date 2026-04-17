@@ -19,7 +19,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +36,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final SecretGenerator secretGenerator;
     private final CodeVerifier codeVerifier;
+    private final Map<String, String> pendingMfaTokens = new ConcurrentHashMap<>();
 
     public AuthDto.TokenResponse register(AuthDto.RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -63,6 +69,10 @@ public class AuthService {
         if (user.isMfaEnabled()) {
             AuthDto.TokenResponse response = new AuthDto.TokenResponse();
             response.setMfaRequired(true);
+            response.setFirstLoginRequired(user.isFirstLogin());
+            String mfaToken = UUID.randomUUID().toString();
+            pendingMfaTokens.put(user.getEmail(), mfaToken);
+            response.setMfaToken(mfaToken);
             return response;
         }
 
@@ -84,6 +94,11 @@ public class AuthService {
         if (!isValid) {
             throw new BadRequestException("Invalid MFA code");
         }
+        String pendingToken = pendingMfaTokens.get(user.getEmail());
+        if (pendingToken == null || !pendingToken.equals(request.getMfaToken())) {
+            throw new BadRequestException("MFA challenge is invalid or expired");
+        }
+        pendingMfaTokens.remove(user.getEmail());
 
         // Auth success
         UserDetails userDetails = new org.springframework.security.core.userdetails.User(
@@ -99,6 +114,7 @@ public class AuthService {
         response.setAccessToken(jwtUtil.generateToken(userDetails));
         response.setRole(user.getRole());
         response.setMfaRequired(false);
+        response.setFirstLoginRequired(user.isFirstLogin());
         return response;
     }
 
@@ -150,6 +166,7 @@ public class AuthService {
         AuthDto.MfaSetupResponse response = new AuthDto.MfaSetupResponse();
         response.setSecret(secret);
         response.setOtpauthUri(otpauthUri);
+        response.setQrCodeUrl("https://quickchart.io/qr?text=" + URLEncoder.encode(otpauthUri, StandardCharsets.UTF_8));
         return response;
     }
 
@@ -177,6 +194,7 @@ public class AuthService {
         response.setAccessToken(jwtUtil.generateToken(userDetails));
         response.setRole(user.getRole());
         response.setMfaRequired(false);
+        response.setFirstLoginRequired(user.isFirstLogin());
         return response;
     }
 }

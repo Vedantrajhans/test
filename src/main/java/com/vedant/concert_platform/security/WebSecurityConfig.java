@@ -57,8 +57,11 @@ public class WebSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/concerts", "/api/v1/concerts/**").permitAll()
 
                         // Protected endpoints
+                        .requestMatchers("/api/v1/producer/**").hasRole("PRODUCER")
+                        .requestMatchers("/api/v1/promoter/**").hasRole("PROMOTER")
                         .requestMatchers("/api/v1/organizer/**").hasRole("ORGANIZER")
                         .requestMatchers("/api/v1/bookings/**").hasRole("ATTENDEE")
+                        .requestMatchers("/api/v1/feedback/**").hasRole("ATTENDEE")
 
                         // MFA enable/disable requires authentication
                         .requestMatchers("/api/v1/auth/mfa/enable", "/api/v1/auth/mfa/disable").authenticated()

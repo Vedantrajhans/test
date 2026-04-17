@@ -33,6 +33,9 @@ public class TicketType extends BaseEntity {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Version
+    private Integer version;
     public Long getId() { return this.id; }
     public void setId(Long id) { this.id = id; }
     public Concert getConcert() { return this.concert; }
@@ -47,4 +50,6 @@ public class TicketType extends BaseEntity {
     public void setQuantitySold(Integer quantitySold) { this.quantitySold = quantitySold; }
     public String getDescription() { return this.description; }
     public void setDescription(String description) { this.description = description; }
+    public Integer getVersion() { return this.version; }
+    public void setVersion(Integer version) { this.version = version; }
 }

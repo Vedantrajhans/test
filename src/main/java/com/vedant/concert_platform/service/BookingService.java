@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,49 +42,47 @@ public class BookingService {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(username).orElseThrow();
 
-        Concert concert = concertRepository.findById(request.getConcertId())
-                .orElseThrow(() -> new ResourceNotFoundException("Concert not found"));
+        try {
+            Concert concert = concertRepository.findByIdForUpdate(request.getConcertId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Concert not found"));
+            TicketType ticketType = ticketTypeRepository.findByIdForUpdate(request.getTicketTypeId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Ticket Type not found"));
 
-        TicketType ticketType = ticketTypeRepository.findById(request.getTicketTypeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket Type not found"));
+            if (!ticketType.getConcert().getId().equals(concert.getId())) {
+                throw new BadRequestException("Ticket type does not belong to this concert");
+            }
 
-        if (!ticketType.getConcert().getId().equals(concert.getId())) {
-            throw new BadRequestException("Ticket type does not belong to this concert");
+            int availableTickets = ticketType.getQuantityAvailable() - ticketType.getQuantitySold();
+            if (request.getQuantity() > availableTickets) {
+                throw new ConflictException("Not enough tickets available for this tier");
+            }
+
+            if (concert.getTicketsSold() + request.getQuantity() > concert.getTotalCapacity()) {
+                throw new ConflictException("Concert has reached total capacity");
+            }
+
+            ticketType.setQuantitySold(ticketType.getQuantitySold() + request.getQuantity());
+            concert.setTicketsSold(concert.getTicketsSold() + request.getQuantity());
+            ticketTypeRepository.save(ticketType);
+            concertRepository.save(concert);
+
+            TicketBooking booking = new TicketBooking();
+            booking.setUuid(UUID.randomUUID());
+            booking.setUser(user);
+            booking.setConcert(concert);
+            booking.setTicketType(ticketType);
+            booking.setQuantity(request.getQuantity());
+
+            BigDecimal totalAmount = ticketType.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
+            booking.setTotalAmount(totalAmount);
+            booking.setPaymentStatus(PaymentStatus.PENDING);
+            booking.setBookingStatus(BookingStatus.PENDING);
+            TicketBooking savedBooking = bookingRepository.save(booking);
+
+            return mapToResponse(savedBooking);
+        } catch (ObjectOptimisticLockingFailureException ex) {
+            throw new ConflictException("Concurrent booking detected. Please retry.");
         }
-
-        int availableTickets = ticketType.getQuantityAvailable() - ticketType.getQuantitySold();
-        if (request.getQuantity() > availableTickets) {
-            throw new ConflictException("Not enough tickets available for this tier");
-        }
-
-        if (concert.getTicketsSold() + request.getQuantity() > concert.getTotalCapacity()) {
-            throw new ConflictException("Concert has reached total capacity");
-        }
-
-        // Update counts (Optimistic locking will catch concurrent issues here via version)
-        ticketType.setQuantitySold(ticketType.getQuantitySold() + request.getQuantity());
-        concert.setTicketsSold(concert.getTicketsSold() + request.getQuantity());
-        
-        ticketTypeRepository.save(ticketType);
-        concertRepository.save(concert);
-
-        // Create booking
-        TicketBooking booking = new TicketBooking();
-        booking.setUuid(UUID.randomUUID());
-        booking.setUser(user);
-        booking.setConcert(concert);
-        booking.setTicketType(ticketType);
-        booking.setQuantity(request.getQuantity());
-        
-        BigDecimal totalAmount = ticketType.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
-        booking.setTotalAmount(totalAmount);
-        
-        booking.setPaymentStatus(PaymentStatus.PENDING);
-        booking.setBookingStatus(BookingStatus.PENDING); // Temporary lock
-        
-        TicketBooking savedBooking = bookingRepository.save(booking);
-
-        return mapToResponse(savedBooking);
     }
 
     @Transactional

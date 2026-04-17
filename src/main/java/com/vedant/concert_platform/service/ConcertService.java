@@ -4,7 +4,9 @@ import com.vedant.concert_platform.dto.ConcertDto;
 import com.vedant.concert_platform.dto.PageResponse;
 import com.vedant.concert_platform.entity.Concert;
 import com.vedant.concert_platform.entity.Organizer;
+import com.vedant.concert_platform.entity.User;
 import com.vedant.concert_platform.entity.enums.Status;
+import com.vedant.concert_platform.exception.BadRequestException;
 import com.vedant.concert_platform.exception.ResourceNotFoundException;
 import com.vedant.concert_platform.repository.ConcertRepository;
 import com.vedant.concert_platform.repository.OrganizerRepository;
@@ -94,9 +96,15 @@ public class ConcertService {
 
     private Organizer getCurrentOrganizer() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return organizerRepository.findByUserId(
-                userRepository.findByEmail(username).orElseThrow().getId()
-        ).orElseThrow(() -> new ResourceNotFoundException("Organizer profile not found"));
+        User user = userRepository.findByEmail(username).orElseThrow();
+        if (user.isFirstLogin()) {
+            throw new BadRequestException("Complete first-login password setup before managing concerts");
+        }
+        if (!user.isMfaEnabled()) {
+            throw new BadRequestException("MFA is required for organizer actions");
+        }
+        return organizerRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Organizer profile not found"));
     }
 
     private void updateConcertState(Concert concert, ConcertDto.ConcertRequest request) {

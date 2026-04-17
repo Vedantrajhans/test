@@ -32,4 +32,7 @@ public class Feedback extends BaseEntity {
     private Integer soundQuality;
     private Integer venueExperience;
     private Integer artistPerformance;
+
+    @Version
+    private Integer version;
 }
