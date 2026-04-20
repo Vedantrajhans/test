@@ -1,0 +1,298 @@
+-- ============================================================
+--  STEP 1: Clean slate — delete all concert-related data
+-- ============================================================
+DELETE FROM ticket_bookings;
+DELETE FROM ticket_types;
+DELETE FROM concerts;
+DELETE FROM venues;
+
+-- Reset sequences so IDs start from 1 again
+ALTER SEQUENCE venues_id_seq RESTART WITH 1;
+ALTER SEQUENCE concerts_id_seq RESTART WITH 1;
+ALTER SEQUENCE ticket_types_id_seq RESTART WITH 1;
+
+
+-- ============================================================
+--  STEP 2: Insert seed data
+--  Organizer A → vedantrajhans84@gmail.com   (user id=10)
+--  Organizer B → vedantrajhans724@gmail.com  (user id=11)
+--
+--  Today = 2026-04-19
+--  Rules applied:
+--    • ticket_sale_end   < concert date_time
+--    • ticket_sale_start < ticket_sale_end
+--    • All future concerts have sale windows still OPEN
+--      (sale_end >= today) so tickets are actually purchasable
+-- ============================================================
+
+DO $$
+DECLARE
+v_org_a     BIGINT;
+v_org_b     BIGINT;
+v_venue_id  BIGINT;
+v_cid       BIGINT;
+BEGIN
+
+-- Resolve organizer A
+SELECT o.id INTO v_org_a
+FROM organizers o JOIN users u ON u.id = o.user_id
+WHERE u.email = 'vedantrajhans84@gmail.com' AND u.status = 'ACTIVE'
+LIMIT 1;
+
+IF v_org_a IS NULL THEN
+RAISE EXCEPTION 'Organizer A (vedantrajhans84) not found.';
+END IF;
+
+-- Resolve organizer B
+SELECT o.id INTO v_org_b
+FROM organizers o JOIN users u ON u.id = o.user_id
+WHERE u.email = 'vedantrajhans724@gmail.com' AND u.status = 'ACTIVE'
+LIMIT 1;
+
+IF v_org_b IS NULL THEN
+RAISE EXCEPTION 'Organizer B (vedantrajhans724) not found.';
+END IF;
+
+RAISE NOTICE 'Organizer A id=%, Organizer B id=%', v_org_a, v_org_b;
+
+-- ===========================================================
+--  ORGANIZER A  (vedantrajhans84@gmail.com)
+-- ===========================================================
+
+-- 1. Arijit Singh — Mumbai  (Dec 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('MMRDA Grounds', 'MMRDA Grounds, Bandra Kurla Complex', 'Mumbai', 15000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_a, v_venue_id,
+'Arijit Singh Live — Ek Shaam Arijit Ke Naam',
+'An unforgettable evening with Bollywood''s most loved voice performing his greatest hits live.',
+'Bollywood',
+'2026-12-20 19:00:00', '2026-12-20 23:00:00',
+15000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
+'2026-04-20 10:00:00', '2026-11-19 23:59:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'General',  1499, 10000, 0),
+(v_cid, 'VIP',      4999,  5000, 0);
+
+-- 2. Sunburn Festival — Goa  (Dec 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Vagator Beach', 'Vagator Beach, Bardez', 'Goa', 30000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_a, v_venue_id,
+'Sunburn Festival 2026 — Goa Edition',
+'Asia''s biggest EDM festival returns to the beaches of Goa with world-class DJs.',
+'Electronic',
+'2026-12-27 16:00:00', '2026-12-29 02:00:00',
+30000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800',
+'2026-04-25 10:00:00', '2026-11-26 20:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'Day Pass',     2499, 15000, 0),
+(v_cid, '3-Day Pass',   5999, 15000, 0);
+
+-- 3. Coldplay — Navi Mumbai  (Sep 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('DY Patil Stadium', 'DY Patil Stadium, Nerul', 'Navi Mumbai', 80000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_a, v_venue_id,
+'Coldplay — Music of the Spheres World Tour Mumbai',
+'Coldplay''s record-breaking world tour makes a spectacular stop in Mumbai.',
+'Pop',
+'2026-09-18 18:30:00', '2026-09-18 22:30:00',
+80000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800',
+'2026-04-25 12:00:00', '2026-08-17 20:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'General',   6500, 50000, 0),
+(v_cid, 'Platinum', 15000, 30000, 0);
+
+-- 4. Lollapalooza India — Mumbai  (Oct 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Mahalaxmi Racecourse', 'Mahalaxmi Racecourse, Mahalaxmi', 'Mumbai', 60000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_a, v_venue_id,
+'Lollapalooza India 2026 — Mumbai',
+'India''s biggest multi-genre music festival with international and homegrown headliners.',
+'Rock',
+'2026-10-30 13:00:00', '2026-10-30 23:59:00',
+60000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=800',
+'2026-04-22 10:00:00', '2026-09-29 18:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'General',    5999, 40000, 0),
+(v_cid, 'Backstage', 12999, 20000, 0);
+
+-- ===========================================================
+--  ORGANIZER B  (vedantrajhans724@gmail.com)
+-- ===========================================================
+
+-- 5. NH7 Weekender — Pune  (Nov 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Mahalunge Grounds', 'Mahalunge, Balewadi', 'Pune', 20000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_b, v_venue_id,
+'NH7 Weekender Pune 2026',
+'The happiest music festival on earth returns to Pune with indie, folk and electronic acts.',
+'Indie',
+'2026-11-22 14:00:00', '2026-11-23 23:30:00',
+20000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800',
+'2026-05-01 09:00:00', '2026-10-21 23:59:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, '2-Day Pass', 3499, 14000, 0),
+(v_cid, 'VIP Pass',   7999,  6000, 0);
+
+-- 6. AR Rahman — Chennai  (Aug 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Nehru Indoor Stadium', 'Nehru Indoor Stadium, Periyamet', 'Chennai', 25000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_b, v_venue_id,
+'A R Rahman Live — Nenjukkul Peidhidum',
+'Oscar-winning maestro AR Rahman performs his greatest compositions live in Chennai.',
+'Classical Indian',
+'2026-08-14 19:30:00', '2026-08-14 23:00:00',
+25000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800',
+'2026-05-01 10:00:00', '2026-07-13 20:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'Premium',  2499, 15000, 0),
+(v_cid, 'Gold',     4999, 10000, 0);
+
+-- 7. Shreya Ghoshal — Delhi  (Dec 2026, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Siri Fort Auditorium', 'Siri Fort Auditorium, Khel Gaon Marg', 'Delhi', 8000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_b, v_venue_id,
+'Shreya Ghoshal — Humnava Tour',
+'The golden voice of Bollywood performs her most cherished songs in an intimate setting.',
+'Bollywood',
+'2026-12-06 19:00:00', '2026-12-06 22:30:00',
+8000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800',
+'2026-05-01 10:00:00', '2026-11-05 23:59:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'Standard',   3999, 6000, 0),
+(v_cid, 'Front Row',  8999, 2000, 0);
+
+-- 8. Bangalore Open Air — Metal Fest  (Jan 2027, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Palace Grounds', 'Palace Grounds, Jayamahal Road', 'Bangalore', 10000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_b, v_venue_id,
+'Bangalore Open Air — Metal Fest 2027',
+'India''s premier metal festival featuring the heaviest international and local acts.',
+'Metal',
+'2027-01-08 15:00:00', '2027-01-08 23:30:00',
+10000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800',
+'2026-05-01 10:00:00', '2026-12-07 20:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'General', 4999, 7000, 0),
+(v_cid, 'VIP',     8999, 3000, 0);
+
+-- 9. Prateek Kuhad — Mumbai  (May 2027, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Phoenix Palladium', 'Phoenix Palladium, Lower Parel', 'Mumbai', 3000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_b, v_venue_id,
+'Prateek Kuhad — The Way That Lovers Do',
+'An intimate indie acoustic night with one of India''s most beloved singer-songwriters.',
+'Folk',
+'2027-05-30 20:00:00', '2027-05-30 22:30:00',
+3000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800',
+'2027-01-01 10:00:00', '2027-04-29 20:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'General',      2999, 2800, 0),
+(v_cid, 'Meet & Greet', 5999,  200, 0);
+
+-- 10. Zakir Hussain — Mumbai  (Mar 2027, sale open now)
+INSERT INTO venues (name, address, city, capacity)
+VALUES ('Shanmukhananda Hall', 'Shanmukhananda Hall, Sion', 'Mumbai', 5000)
+RETURNING id INTO v_venue_id;
+
+INSERT INTO concerts (
+organizer_id, venue_id, title, description, genre,
+date_time, end_time, total_capacity, tickets_sold,
+status, image_url, ticket_sale_start, ticket_sale_end, version
+) VALUES (
+v_org_b, v_venue_id,
+'Zakir Hussain & Friends — Tabla Mahotsav',
+'A mesmerizing evening of classical Indian music featuring tabla legend Zakir Hussain.',
+'Classical Indian',
+'2027-03-15 18:00:00', '2027-03-15 22:00:00',
+5000, 0, 'PUBLISHED',
+'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=800',
+'2026-12-01 10:00:00', '2027-02-14 20:00:00', 0
+) RETURNING id INTO v_cid;
+INSERT INTO ticket_types (concert_id, name, price, quantity_available, quantity_sold)
+VALUES (v_cid, 'Standard', 1999, 3000, 0),
+(v_cid, 'Premium',  3999, 2000, 0);
+
+RAISE NOTICE 'Seed complete — 10 concerts inserted across 2 organizers.';
+
+END $$;

@@ -1,0 +1,43 @@
+-- V3__Add_audit_columns.sql
+
+-- Organizers
+ALTER TABLE organizers
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;
+
+-- Venues
+ALTER TABLE venues
+ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;
+
+-- Concerts
+ALTER TABLE concerts
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;
+
+-- Ticket Types
+ALTER TABLE ticket_types
+ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;
+
+-- Ticket Bookings
+ALTER TABLE ticket_bookings
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;
+
+-- Registrations
+ALTER TABLE registrations
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;
+
+-- Feedback
+ALTER TABLE feedback
+ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN created_by BIGINT,
+ADD COLUMN updated_by BIGINT;

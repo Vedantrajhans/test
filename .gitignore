@@ -15,10 +15,9 @@ dist/
 
 # Log files
 *.log
-
+project-festiva/src/main/resources/application.properties
 # Package files
 *.jar
-
 # Maven
 target/
 dist/
