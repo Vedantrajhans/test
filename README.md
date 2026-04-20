@@ -1,29 +1,130 @@
-# README #
+Name : Vedant Rajhans
+2026 Induction Batch 
+Title : Event Management Platform (Concert)
 
-This README would normally document whatever steps are necessary to get your application up and running.
+# Festiva - Concert Management Platform
 
-### What is this repository for? ###
+Festiva is a full-stack web application designed to manage concerts, bookings, and user interactions efficiently. It provides a seamless experience for organizers to create events and for users to explore and book concerts.
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+---
 
-### How do I get set up? ###
+## Features
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+### User Features
 
-### Contribution guidelines ###
+* Register and login securely (JWT-based authentication)
+* Browse available concerts
+* View concert details (venue, date, ticket types)
+* Book tickets for concerts
+* Provide feedback/reviews (only after attending)
 
-* Writing tests
-* Code review
-* Other guidelines
+### Organizer Features
 
-### Who do I talk to? ###
+* Create and manage concerts
+* Add ticket types and pricing
+* View bookings and user engagement
 
-* Repo owner or admin
-* Other community or team contact
+### Security
+
+* Stateless authentication using JWT
+* Role-based access control (User / Organizer)
+* Protected APIs using Spring Security
+
+---
+
+## Tech Stack
+
+### Backend
+
+* Java 17
+* Spring Boot
+* Spring Security (JWT)
+* Spring Data JPA (Hibernate)
+* PostgreSQL
+
+### Frontend
+
+* React.js
+* Axios (API communication)
+
+### Tools & Others
+
+* Maven
+* Git & Bitbucket
+* REST APIs
+
+---
+
+##  Setup Instructions
+
+### Clone the Repository
+
+```
+git clone <your-repo-url>
+cd vedant_induction_fork
+```
+
+---
+
+### Configure Database (PostgreSQL)
+
+Create a database:
+
+```
+CREATE DATABASE festiva;
+```
+
+Update `application.properties`:
+
+```
+spring.datasource.url=jdbc:postgresql://localhost:5432/festiva
+spring.datasource.username=your_username
+spring.datasource.password=your_password
+```
+
+---
+
+### Run Backend
+
+```
+mvn clean install
+mvn spring-boot:run
+```
+
+Server will start on:
+
+```
+http://localhost:8080
+```
+
+---
+
+### Run Frontend
+
+```
+cd client
+npm install
+npm start
+```
+---
+
+## Important Notes
+
+* `application.properties` is ignored for security reasons.
+* Only users with confirmed bookings can submit feedback.
+* Ensure PostgreSQL is running before starting backend.
+
+---
+
+## Future Enhancements
+
+* Payment gateway integration
+* Email notifications
+* Admin dashboard
+* Advanced search & filters
+
+---
+
+## License
+
+This project is for learning and demonstration purposes.
