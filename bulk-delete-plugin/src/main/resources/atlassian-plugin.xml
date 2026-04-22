@@ -1,0 +1,52 @@
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
+   <plugin-info>
+    <description>${project.description}</description>
+    <version>${project.version}</version>
+    <vendor name="${project.organization.name}" url="${project.organization.url}"/>
+    <param name="plugin-icon">images/pluginIcon.png</param>
+    <param name="plugin-logo">images/pluginLogo.png</param>
+    <param name="configure.url">/plugins/servlet/bulk-delete-page</param>
+</plugin-info>
+
+    <!-- i18n resource -->
+    <resource type="i18n" name="i18n" location="bulk-delete-plugin"/>
+
+    <!-- Web resources -->
+    <web-resource key="bulk-delete-plugin-resources" name="bulk-delete-plugin Web Resources">
+        <dependency>com.atlassian.auiplugin:ajs</dependency>
+        <resource type="download" name="bulk-delete-plugin.css" location="/css/bulk-delete-plugin.css"/>
+        <resource type="download" name="bulk-delete-plugin.js" location="/js/bulk-delete-plugin.js"/>
+        <resource type="download" name="images/" location="/images"/>
+        <context>bulk-delete-plugin</context>
+    </web-resource>
+
+    <!-- REST endpoint -->
+    <rest key="bulk-delete-rest" path="/bulkdelete" version="1.0">
+        <description>Bulk Delete REST API</description>
+    </rest>
+
+    <!-- Servlet -->
+    <servlet name="Bulk Delete Servlet"
+             key="bulk-delete-servlet"
+             class="com.example.jira.bulkdelete.servlet.BulkDeleteServlet">
+        <url-pattern>/bulk-delete-page</url-pattern>
+    </servlet>
+
+    <!-- Top navigation menu item -->
+   <web-item key="bulk-delete-link"
+          name="Bulk Delete Link"
+          section="system.top.navigation.bar"
+          weight="1000">
+    <label>Delete Project Issues</label>
+    <link linkId="bulk-delete-link">/plugins/servlet/bulk-delete-page</link>
+</web-item>
+
+<web-item key="bulk-delete-link-2"
+          name="Bulk Delete Link 2"
+          section="system.navbar.left"
+          weight="1000">
+    <label>Delete Project Issues</label>
+    <link linkId="bulk-delete-link-2">/plugins/servlet/bulk-delete-page</link>
+</web-item>
+
+</atlassian-plugin>
